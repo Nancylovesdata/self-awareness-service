@@ -30,13 +30,14 @@ import { User } from '@app/quiz/entities/user.entity'; // <-- CORRECTED IMPORT P
 import { AuthModule } from '@app/auth/auth.module';
 import { Question } from './quiz/entities/question.entity';
 import { StudentResponse } from './quiz/entities/student-response.entity';
+import { Option } from './quiz/entities/option.entity'; //
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'db.sqlite',
-      entities: [User, Question, StudentResponse],
+      entities: [User, Question, Option, StudentResponse],
       synchronize: true,
     }),
     QuizModule,

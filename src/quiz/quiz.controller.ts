@@ -18,25 +18,38 @@
 // }
 
 // src/quiz/quiz.controller.ts
-import { Controller, Post, Body, Get } from '@nestjs/common'; // Import Get decorator
-import { QuizService } from '@app/quiz/quiz.service'; // Using @app alias
+// src/quiz/quiz.controller.ts
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common'; // Add UseGuards, Req
+import { AuthGuard } from '@nestjs/passport'; // Add AuthGuard
+import { QuizService } from './quiz.service';
+import { SubmitAnswersDto } from './dto/submit-answers.dto';
+import { QuizResultDto } from './dto/quiz-result.dto'; // Assuming you have this DTO
 
 @Controller('quiz')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
-  // NEW ENDPOINT: Fetch all questions
-  @Get('questions') // This endpoint will be accessible at /quiz/questions
+  @Get('questions')
   async getQuestions() {
-    return this.quizService.findAllQuestions();
+    return this.quizService.getQuestions();
   }
 
   @Post('submit-answers')
+  @UseGuards(AuthGuard('jwt')) // <-- Protect this route with JWT authentication
   async submitAnswers(
-    @Body('answers')
-    answers: { questionId: number; selectedOptionIndex: number }[],
-    @Body('studentId') studentId?: string,
-  ) {
-    return this.quizService.submitAnswers(answers, studentId);
+    @Body() submitAnswersDto: SubmitAnswersDto,
+    @Req() req: any, // <-- Inject the request object to access user data
+  ): Promise<QuizResultDto> {
+    // The JwtStrategy validates the token and attaches `user` to `req`
+    // `req.user` will contain `{ userId: number, username: string, fullName: string }`
+    const userId = req.user.userId;
+    const fullName = req.user.fullName; // Get user's full name
+
+    // Pass the userId and fullName to the service
+    return this.quizService.submitAnswers(
+      submitAnswersDto.answers,
+      userId,
+      fullName,
+    );
   }
 }

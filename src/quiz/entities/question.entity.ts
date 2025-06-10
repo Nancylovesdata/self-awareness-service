@@ -1,5 +1,6 @@
 // src/quiz/entities/question.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm'; // Add OneToMany
+import { Option } from './option.entity'; // Import the Option entity
 
 @Entity()
 export class Question {
@@ -9,8 +10,8 @@ export class Question {
   @Column()
   text: string;
 
-  // REMOVE nullable: false AND default: []
-  // The type should already be 'json'
-  @Column({ type: 'json' }) // <-- CHANGE THIS LINE
-  options: { text: string; correspondence: string }[];
+  @OneToMany(() => Option, (option) => option.question, { cascade: true }) // One question has many options
+  // { cascade: true } means if you save a Question, its new Options will also be saved.
+  // If you delete a Question, its Options might also be deleted (depending on database ON DELETE CASCADE rules).
+  options: Option[]; // This defines the relationship
 }
