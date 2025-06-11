@@ -1,4 +1,5 @@
 // src/quiz/entities/student-response.entity.ts
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,45 +8,34 @@ import {
   JoinColumn,
   CreateDateColumn,
 } from 'typeorm';
+import { User } from '@app/quiz/entities/user.entity'; // Path to your User entity
 import { Question } from './question.entity';
-import { User } from '@app/quiz/entities/user.entity'; // Import User entity (confirm this path/alias)
-import { Option } from './option.entity'; // <-- NEW: Import Option entity here!
+import { Option } from './option.entity';
 
-@Entity()
+@Entity('student_response')
 export class StudentResponse {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.studentResponses, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(() => User, (user) => user.studentResponses, { nullable: true }) // <-- ADD { nullable: true }
   @JoinColumn({ name: 'userId' })
-  user: User; // This will hold the User object
+  user: User; // Changed from userId: number to user: User
 
-  @Column()
-  userId: number; // This column stores the ID of the user
+  // The actual foreign key column. It should also be nullable now.
+  @Column({ type: 'integer', nullable: true }) // <-- ADD { nullable: true }
+  userId: number; // This remains for the column itself
 
   @ManyToOne(() => Question, (question) => question.studentResponses)
-  @JoinColumn({ name: 'questionId' }) // Added for consistency, if you have a questionId column
+  @JoinColumn({ name: 'questionId' })
   question: Question;
 
-  @Column() // Added for consistency, if you have a questionId column
-  questionId: number; // The actual foreign key column for Question
-
-  // *** START NEWLY ADDED/CORRECTED SECTION ***
-  @ManyToOne(() => Option, (option) => option.studentResponses, {
-    onDelete: 'CASCADE', // Optional: if option is deleted, delete this response
-  })
-  @JoinColumn({ name: 'selectedOptionId' }) // This links the selectedOptionId column to the Option's primary key
-  selectedOption: Option; // This will hold the Option object
-
-  @Column() // Keep the column for the foreign key, if you want it explicitly
-  selectedOptionId: number; // This column stores the ID of the selected option
-  // *** END NEWLY ADDED/CORRECTED SECTION ***
+  @ManyToOne(() => Option, (option) => option.studentResponses)
+  @JoinColumn({ name: 'selectedOptionId' })
+  selectedOption: Option;
 
   @Column()
   selectedOptionCorrespondence: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }) // <-- Changed 'datetime' to 'timestamp'
   timestamp: Date;
 }

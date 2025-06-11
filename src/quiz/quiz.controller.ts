@@ -1,38 +1,66 @@
-// src/quiz/quiz.controller.ts (CORRECTED)
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+// src/quiz/quiz.controller.ts
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  // Removed UseGuards here
+  // Removed Request here, as it's not needed without auth for user info
+  Param,
+  NotFoundException,
+} from '@nestjs/common';
 import { QuizService } from './quiz.service';
+// import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // <-- No longer needed
+import { Question } from './entities/question.entity';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // <--- CORRECT IMPORT FOR THE GUARD
-import { Request } from 'express';
 
 @Controller('quiz')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
   @Get('questions')
-  async getQuestions() {
+  async getQuestions(): Promise<Question[]> {
     return this.quizService.getQuestions();
   }
 
-  @UseGuards(JwtAuthGuard) // <--- Use your specific guard here
-  @Post('submit-answers')
+  @Post('submit-answers') // <-- Removed @UseGuards
   async submitAnswers(
     @Body() submitAnswersDto: SubmitAnswersDto,
-    @Req() req: Request,
+    // @Request() req, // <-- Removed this parameter
   ) {
-    // These logs will appear if the guard successfully authenticates the request
-    console.log('--- In QuizController submitAnswers method ---');
-    console.log('Authenticated User (req.user):', req.user); // This object comes from JwtStrategy's return
-    const userId = req.user['id']; // Correctly access the 'id' property
-    const fullName = req.user['fullName'];
-    console.log('User ID from JWT payload:', userId);
-    console.log('Full Name from JWT payload:', fullName);
-    console.log('--- End QuizController submitAnswers method ---');
+    // If no authentication, we cannot get userId or fullName from req.user
+    // The QuizSubmission entity takes userName and phoneNumber directly from DTO.
+    // However, StudentResponse still needs a userId, which will require a change below.
 
-    return this.quizService.submitAnswers(
-      submitAnswersDto.answers,
-      userId,
-      fullName,
-    );
+    // For now, if no auth, we'll pass null or a placeholder for userId to service.
+    // This will lead to an error unless we make changes to StudentResponse's userId.
+    const userId = null; // We can't get a user ID from an authenticated user
+    // fullName is now directly available as submitAnswersDto.userName
+
+    return {
+      message: 'Quiz submitted successfully!',
+      data: await this.quizService.submitAnswers(
+        submitAnswersDto,
+        // userId, // We need to address this in QuizService as it's a non-nullable foreign key
+      ),
+    };
+  }
+
+  @Get('submissions/:id')
+  async getQuizSubmissionById(@Param('id') submissionId: string) {
+    try {
+      const submission =
+        await this.quizService.getQuizSubmissionById(submissionId);
+      return {
+        message: 'Quiz submission found.',
+        data: submission,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw error;
+    }
   }
 }

@@ -9,6 +9,7 @@ import { User } from './quiz/entities/user.entity';
 import { Question } from './quiz/entities/question.entity';
 import { StudentResponse } from './quiz/entities/student-response.entity';
 import { Option } from './quiz/entities/option.entity';
+import { QuizSubmission } from './quiz/entities/quiz-submission.entity'; // <-- NEW: Import QuizSubmission
 
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -22,9 +23,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         type: 'postgres',
-        url: configService.get<string>('DATABASE_URL'), // <--- CORRECTED: Just the variable name 'DATABASE_URL'
-        entities: [User, Question, Option, StudentResponse],
-        synchronize: true,
+        url: configService.get<string>('DATABASE_URL'),
+        entities: [User, Question, Option, StudentResponse, QuizSubmission], // <-- ADD QuizSubmission HERE!
+        synchronize: false, // <-- CRITICAL CHANGE: Set to false for migrations!
         ssl: {
           rejectUnauthorized: false,
         },
