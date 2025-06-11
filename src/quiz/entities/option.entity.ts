@@ -1,6 +1,13 @@
 // src/quiz/entities/option.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Question } from './question.entity'; // Import the Question entity
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm'; // Import OneToMany
+import { Question } from './question.entity';
+import { StudentResponse } from './student-response.entity'; // Import StudentResponse entity
 
 @Entity()
 export class Option {
@@ -8,14 +15,20 @@ export class Option {
   id: number;
 
   @Column()
-  text: string; // e.g., "Always"
+  text: string;
 
   @Column()
-  correspondence: string; // e.g., "A", "D", "N", "C"
+  correspondence: string; // 'A', 'D', 'N', 'C'
 
-  @ManyToOne(() => Question, (question) => question.options) // Many options to one question
+  @ManyToOne(() => Question, (question) => question.options, {
+    onDelete: 'CASCADE',
+  })
   question: Question;
 
-  @Column() // To store the foreign key (questionId)
-  questionId: number;
+  // NEW: Add the OneToMany relationship to StudentResponse
+  @OneToMany(
+    () => StudentResponse,
+    (studentResponse) => studentResponse.selectedOption,
+  )
+  studentResponses: StudentResponse[]; // This is the property the error was complaining about
 }

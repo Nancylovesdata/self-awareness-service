@@ -5,40 +5,47 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  CreateDateColumn,
 } from 'typeorm';
-import { Question } from '@app/quiz/entities/question.entity';
-import { User } from '@app/quiz/entities/user.entity'; // <-- IMPORT USER ENTITY HERE
+import { Question } from './question.entity';
+import { User } from '@app/quiz/entities/user.entity'; // Import User entity (confirm this path/alias)
+import { Option } from './option.entity'; // <-- NEW: Import Option entity here!
 
 @Entity()
 export class StudentResponse {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // You can keep studentId for legacy/non-logged-in users if needed,
-  // but if all responses MUST be linked to a User, this can be removed or made nullable.
-  // For now, let's keep it to support both.
-  @Column({ nullable: true })
-  studentId: string;
+  @ManyToOne(() => User, (user) => user.studentResponses, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'userId' })
+  user: User; // This will hold the User object
 
-  @ManyToOne(() => Question)
-  @JoinColumn({ name: 'questionId' })
+  @Column()
+  userId: number; // This column stores the ID of the user
+
+  @ManyToOne(() => Question, (question) => question.studentResponses)
+  @JoinColumn({ name: 'questionId' }) // Added for consistency, if you have a questionId column
   question: Question;
+
+  @Column() // Added for consistency, if you have a questionId column
+  questionId: number; // The actual foreign key column for Question
+
+  // *** START NEWLY ADDED/CORRECTED SECTION ***
+  @ManyToOne(() => Option, (option) => option.studentResponses, {
+    onDelete: 'CASCADE', // Optional: if option is deleted, delete this response
+  })
+  @JoinColumn({ name: 'selectedOptionId' }) // This links the selectedOptionId column to the Option's primary key
+  selectedOption: Option; // This will hold the Option object
+
+  @Column() // Keep the column for the foreign key, if you want it explicitly
+  selectedOptionId: number; // This column stores the ID of the selected option
+  // *** END NEWLY ADDED/CORRECTED SECTION ***
 
   @Column()
   selectedOptionCorrespondence: string;
 
-  @Column({ type: 'datetime', default: 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   timestamp: Date;
-
-  // --- ADD THESE LINES FOR THE USER RELATIONSHIP ---
-  @ManyToOne(() => User, (user) => user.studentResponses, {
-    nullable: true, // A response might not always be linked to a registered user if you allow guest submissions
-    onDelete: 'SET NULL', // Optional: What happens if a user is deleted? (SET NULL, CASCADE, RESTRICT)
-  })
-  @JoinColumn({ name: 'userId' }) // This creates the foreign key column 'userId' in StudentResponse table
-  user: User; // The actual property that holds the User object
-
-  @Column({ nullable: true }) // The foreign key column itself
-  userId: number;
-  // --- END ADDITIONS ---
 }

@@ -1,28 +1,33 @@
-// src/quiz/quiz.controller.ts
+// src/quiz/quiz.controller.ts (CORRECTED)
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { QuizService } from './quiz.service';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
-import { AuthGuard } from '@nestjs/passport'; // Import AuthGuard
-import { Request } from 'express'; // Import Request from express
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // <--- CORRECT IMPORT FOR THE GUARD
+import { Request } from 'express';
 
 @Controller('quiz')
 export class QuizController {
   constructor(private readonly quizService: QuizService) {}
 
-  @Get('questions') // <-- New endpoint for fetching questions
+  @Get('questions')
   async getQuestions() {
     return this.quizService.getQuestions();
   }
 
-  @UseGuards(AuthGuard('jwt')) // Apply AuthGuard to protect this route
+  @UseGuards(JwtAuthGuard) // <--- Use your specific guard here
   @Post('submit-answers')
   async submitAnswers(
     @Body() submitAnswersDto: SubmitAnswersDto,
-    @Req() req: Request, // Inject the request object to access user data
+    @Req() req: Request,
   ) {
-    // The user object is attached to the request by JwtStrategy
-    const userId = req.user['sub']; // 'sub' typically holds the user ID from the JWT payload
-    const fullName = req.user['fullName']; // Assuming 'fullName' is also in your JWT payload
+    // These logs will appear if the guard successfully authenticates the request
+    console.log('--- In QuizController submitAnswers method ---');
+    console.log('Authenticated User (req.user):', req.user); // This object comes from JwtStrategy's return
+    const userId = req.user['id']; // Correctly access the 'id' property
+    const fullName = req.user['fullName'];
+    console.log('User ID from JWT payload:', userId);
+    console.log('Full Name from JWT payload:', fullName);
+    console.log('--- End QuizController submitAnswers method ---');
 
     return this.quizService.submitAnswers(
       submitAnswersDto.answers,

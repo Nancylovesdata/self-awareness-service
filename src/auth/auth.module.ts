@@ -1,24 +1,30 @@
-// src/auth/auth.module.ts
+// src/auth/auth.module.ts (Ensure this is correct)
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { PassportModule } from '@nestjs/passport'; // <-- Add this import
-import { JwtModule } from '@nestjs/jwt'; // <-- Add this import
-import { User } from '@app/quiz/entities/user.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtStrategy } from './jwt.strategy'; // <-- Add this import
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../quiz/entities/user.entity';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { JwtStrategy } from './jwt.strategy';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule,
-    JwtModule.register({
-      secret: 'YOUR_VERY_STRONG_SECRET_KEY',
-      signOptions: { expiresIn: '1h' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'), // <-- Double-check this line
+        signOptions: { expiresIn: '60m' },
+      }),
+      inject: [ConfigService],
     }),
+    ConfigModule.forRoot({ isGlobal: true }), // Ensure ConfigModule is set up
   ],
-  providers: [AuthService, JwtStrategy], // <-- Add JwtStrategy here
   controllers: [AuthController],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtStrategy], // JwtStrategy is essential here
+  exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}

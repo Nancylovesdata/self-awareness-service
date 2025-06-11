@@ -1,19 +1,22 @@
 // src/quiz/dto/submit-answers.dto.ts
-import { IsArray, IsNumber, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty } from 'class-validator';
+import { Type } from 'class-transformer'; // You might need this if you're transforming nested DTOs
+import { ValidateNested } from 'class-validator'; // You might need this for nested DTOs
 
-// DTO for a single answer within the submission
-class AnswerDto {
-  @IsNumber()
+export class AnswerDto {
+  @IsInt()
+  @IsNotEmpty()
   questionId: number;
 
-  @IsNumber()
-  selectedOptionIndex: number;
+  @IsInt() // Validate it's an integer
+  @IsNotEmpty() // Validate it's not empty
+  selectedOptionId: number; // <--- THIS IS THE CRITICAL CHANGE. IT MUST BE selectedOptionId
+  // It MUST NOT be selectedOptionIndex
 }
 
-// DTO for the overall quiz submission
 export class SubmitAnswersDto {
-  @IsArray()
+  // Add these decorators if you haven't already and use class-validator/transformer
+  // They help validate the array of nested DTOs
   @ValidateNested({ each: true })
   @Type(() => AnswerDto)
   answers: AnswerDto[];

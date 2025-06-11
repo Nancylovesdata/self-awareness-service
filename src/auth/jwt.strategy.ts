@@ -1,40 +1,58 @@
-// src/auth/jwt.strategy.ts
-import { Injectable } from '@nestjs/common';
+// src/auth/jwt.strategy.ts (With debugging logs)
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, ExtractJwt } from 'passport-jwt';
-import { AuthService } from './auth.service'; // To validate user if needed
-
-// Define the payload interface for your JWT token
-export interface JwtPayload {
-  username: string;
-  sub: number; // User ID
-}
+import { AuthService } from './auth.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private authService: AuthService) {
-    // Inject AuthService if you need to fetch user from DB
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // Extract token from Authorization: Bearer <token>
-      ignoreExpiration: false, // Do not ignore token expiration
-      secretOrKey: 'YOUR_VERY_STRONG_SECRET_KEY', // <-- MUST MATCH THE SECRET IN AuthModule
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: process.env.JWT_SECRET || 'YOUR_SECRET_KEY', // <--- THIS SECRET MUST MATCH JWTModule's secret
     });
   }
 
-  async validate(payload: JwtPayload) {
-    // This method is called after the token is verified (signature, expiration)
-    // You can fetch the user from the database here to ensure they still exist
-    const user = await this.authService.findOne(payload.username);
-    if (!user) {
-      // You could throw an UnauthorizedException here
-      return null; // Or return false, Passport will handle authentication failure
+  async validate(payload: any) {
+    console.log('--- Inside JwtStrategy validate method ---');
+    console.log('Received payload:', payload);
+
+    const currentTime = Date.now() / 1000;
+    if (payload.exp && payload.exp < currentTime) {
+      console.log(
+        'Token has expired! Expiration time:',
+        payload.exp,
+        'Current time:',
+        currentTime,
+      );
+      throw new UnauthorizedException('Token expired');
+    } else if (payload.exp) {
+      console.log(
+        'Token is still valid. Expires at:',
+        payload.exp,
+        'Current time:',
+        currentTime,
+      );
     }
-    // If validation is successful, the payload will be attached to req.user
-    // It's good practice to return a subset of the user object, e.g., userId and username
-    return {
-      userId: payload.sub,
-      username: payload.username,
-      fullName: user.fullName,
-    }; // Return what you want in req.user
+
+    const user = await this.authService.findOne(payload.email); // Or findById(payload.sub) if you prefer
+
+    console.log('User found in DB:', user ? user.email : 'None');
+
+    if (!user) {
+      console.log(
+        'User not found in DB based on payload email:',
+        payload.email,
+      );
+      throw new UnauthorizedException('User not found');
+    }
+
+    const { password, ...result } = user;
+
+    console.log('Validated user (without password):', result);
+    console.log('--- End JwtStrategy validate method ---');
+
+    return result; // This 'result' object will be attached to req.user
   }
 }

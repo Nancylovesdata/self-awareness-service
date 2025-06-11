@@ -1,109 +1,33 @@
-// // src/quiz/quiz.service.ts
-// import { Injectable, NotFoundException } from '@nestjs/common';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { Repository } from 'typeorm';
-// import { Question } from './entities/question.entity';
-// import { StudentResponse } from './entities/student-response.entity';
-
-// @Injectable()
-// export class QuizService {
-//   // Define the meanings of the letters directly in the service
-//   private readonly letterMeanings: { [key: string]: string } = {
-//     A: 'Assertor',
-//     D: 'Demonstrator',
-//     N: 'Narrator',
-//     C: 'Contemplator',
-//   };
-
-//   constructor(
-//     @InjectRepository(Question)
-//     private questionRepository: Repository<Question>,
-//     @InjectRepository(StudentResponse)
-//     private studentResponseRepository: Repository<StudentResponse>,
-//   ) {}
-
-//   async submitAnswers(
-//     answers: { questionId: number; selectedOptionIndex: number }[],
-//     studentId?: string,
-//   ) {
-//     const scoreCard: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
-//     const newResponses: StudentResponse[] = [];
-
-//     for (const answer of answers) {
-//       const question = await this.questionRepository.findOne({
-//         where: { id: answer.questionId },
-//       });
-
-//       if (!question) {
-//         throw new NotFoundException(
-//           `Question with ID ${answer.questionId} not found.`,
-//         );
-//       }
-
-//       const selectedOption = question.options[answer.selectedOptionIndex];
-//       if (!selectedOption) {
-//         throw new NotFoundException(
-//           `Invalid option index ${answer.selectedOptionIndex} for question ${answer.questionId}.`,
-//         );
-//       }
-
-//       const correspondenceLetter = selectedOption.correspondence;
-//       scoreCard[correspondenceLetter]++;
-
-//       const newResponse = this.studentResponseRepository.create({
-//         studentId,
-//         question,
-//         selectedOptionCorrespondence: correspondenceLetter,
-//       });
-//       newResponses.push(newResponse);
-//     }
-
-//     await this.studentResponseRepository.save(newResponses);
-
-//     let dominantLetter: string | null = null;
-//     let maxScore = -1;
-
-//     for (const letter in scoreCard) {
-//       if (scoreCard[letter] > maxScore) {
-//         maxScore = scoreCard[letter];
-//         dominantLetter = letter;
-//       } else if (scoreCard[letter] === maxScore) {
-//         // If there's a tie for the highest score, you can decide how to handle it.
-//         // For now, it will return the first letter encountered with the max score.
-//         // If you want to return all tied letters, dominantLetter would need to be an array.
-//       }
-//     }
-
-//     const dominantLetterMeaning = dominantLetter
-//       ? this.letterMeanings[dominantLetter]
-//       : null;
-
-//     return {
-//       scores: scoreCard,
-//       publicSpeakingPersonalityType: dominantLetter,
-//       publicSpeakingPersonalityMeaning: dominantLetterMeaning, // New field!
-//     };
-//   }
-// }
-
 // src/quiz/quiz.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from './entities/question.entity';
 import { StudentResponse } from './entities/student-response.entity';
+import { Option } from './entities/option.entity'; // <-- NEW: Import Option entity
+import { User } from '../quiz/entities/user.entity'; // <-- NEW: Import User entity (adjust path if User is in auth/entities)
 import { QuizResultDto } from './dto/quiz-result.dto';
-// REMOVE THIS LINE: import { User } from '@app/auth/entities/user.entity'; // <-- REMOVE THIS IMPORT IF NOT USED
+import { AnswerDto } from './dto/submit-answers.dto';
 
 @Injectable()
 export class QuizService {
+  // Define the meanings of the letters directly in the service
+  private readonly letterMeanings: { [key: string]: string } = {
+    A: 'Assertor',
+    D: 'Demonstrator',
+    N: 'Narrator',
+    C: 'Contemplator',
+  };
+
   constructor(
     @InjectRepository(Question)
     private questionRepository: Repository<Question>,
     @InjectRepository(StudentResponse)
     private studentResponseRepository: Repository<StudentResponse>,
-    // REMOVE THIS: @InjectRepository(User) // <-- REMOVE THIS LINE
-    // REMOVE THIS: private userRepository: Repository<User>, // <-- REMOVE THIS LINE
+    @InjectRepository(Option) // <-- NEW: Inject OptionRepository
+    private optionRepository: Repository<Option>, // This is not strictly needed for the .find() but good practice
+    @InjectRepository(User) // <-- NEW: Inject UserRepository
+    private userRepository: Repository<User>,
   ) {}
 
   async getQuestions(): Promise<Question[]> {
@@ -113,43 +37,64 @@ export class QuizService {
   }
 
   async submitAnswers(
-    answers: { questionId: number; selectedOptionIndex: number }[],
+    // CHANGE 1: Use selectedOptionId as provided by the client
+    answers: AnswerDto[], // <--- CORRECTED PARAMETER TYPE
     userId: number,
     fullName: string,
   ): Promise<QuizResultDto> {
+    console.log('--- Inside QuizService submitAnswers method ---');
+    console.log('Received answers:', answers);
+    console.log('Received userId:', userId);
+    console.log('Received fullName:', fullName);
+
     const scores: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
     const savedResponses: StudentResponse[] = [];
+
+    // Find the user entity based on the userId provided by the JWT
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found.`);
+    }
 
     for (const answer of answers) {
       const question = await this.questionRepository.findOne({
         where: { id: answer.questionId },
-        relations: ['options'],
+        relations: ['options'], // Ensure options are loaded with the question
       });
 
       if (!question) {
-        throw new NotFoundException(
-          `Question with ID ${answer.questionId} not found.`,
+        console.warn(
+          `Question with ID ${answer.questionId} not found. Skipping.`,
         );
+        // Decide if you want to throw an error or just skip invalid questions
+        continue; // Skip to the next answer
       }
 
-      if (
-        answer.selectedOptionIndex < 0 ||
-        answer.selectedOptionIndex >= question.options.length
-      ) {
-        throw new NotFoundException(
-          `Invalid option index for question ID ${answer.questionId}.`,
+      // CHANGE 2: Find the selected option by its ID, not its index
+      const selectedOption = question.options.find(
+        (option) => option.id === answer.selectedOptionId, // <--- CORRECTED LOGIC
+      );
+
+      if (!selectedOption) {
+        console.warn(
+          `Option with ID ${answer.selectedOptionId} not found for question ID ${answer.questionId}. Skipping.`,
         );
+        // Decide if you want to throw an error or just skip invalid options
+        continue; // Skip to the next answer
       }
 
-      const selectedOption = question.options[answer.selectedOptionIndex];
+      // Line that was causing the error, now selectedOption should be defined
       const correspondence = selectedOption.correspondence;
       scores[correspondence] = (scores[correspondence] || 0) + 1;
 
+      // CHANGE 4: Assign the user entity to the student response
       const studentResponse = this.studentResponseRepository.create({
+        user: user, // <--- Assign the actual User entity, not just the ID
         question: question,
+        selectedOption: selectedOption, // Save the entire selected option
         selectedOptionCorrespondence: correspondence,
         timestamp: new Date(),
-        userId: userId,
       });
       savedResponses.push(studentResponse);
     }
@@ -160,23 +105,13 @@ export class QuizService {
       scores[a] > scores[b] ? a : b,
     );
 
-    let publicSpeakingPersonalityMeaning: string;
-    switch (personalityType) {
-      case 'A':
-        publicSpeakingPersonalityMeaning = 'Assertor';
-        break;
-      case 'D':
-        publicSpeakingPersonalityMeaning = 'Demonstrator';
-        break;
-      case 'N':
-        publicSpeakingPersonalityMeaning = 'Narrator';
-        break;
-      case 'C':
-        publicSpeakingPersonalityMeaning = 'Contemplator';
-        break;
-      default:
-        publicSpeakingPersonalityMeaning = 'Unknown';
-    }
+    // CHANGE 5: Use letterMeanings for clearer assignment
+    const publicSpeakingPersonalityMeaning =
+      this.letterMeanings[personalityType] || 'Unknown';
+
+    console.log('Calculated Scores:', scores);
+    console.log('Determined Personality Type:', personalityType);
+    console.log('--- End QuizService submitAnswers method ---');
 
     return {
       scores: scores as { A: number; D: number; N: number; C: number },

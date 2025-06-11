@@ -5,9 +5,11 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  UnauthorizedException,
-} from '@nestjs/common'; // Add UnauthorizedException
+  // UnauthorizedException, // This is not needed here as the service throws it
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { RegisterDto } from '../quiz/dto/register.dto'; // <-- Import your RegisterDto
+import { LoginDto } from '../quiz/dto/login.dto'; // <-- Import your LoginDto
 
 @Controller('auth')
 export class AuthController {
@@ -15,32 +17,20 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  async signUp(
-    @Body('username') username: string,
-    @Body('password') password: string,
-    @Body('fullName') fullName: string,
-    @Body('phoneNumber') phoneNumber?: string,
-  ) {
-    const user = await this.authService.registerUser(
-      username,
-      password,
-      fullName,
-      phoneNumber,
-    );
+  // Change to accept the RegisterDto object
+  async signUp(@Body() registerDto: RegisterDto) {
+    // Pass the DTO object directly to the service method
+    const user = await this.authService.registerUser(registerDto);
     const { password: _, ...result } = user;
     return result;
   }
 
-  // <-- ADD THIS NEW ENDPOINT FOR LOGIN
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(
-    @Body('username') username: string,
-    @Body('password') password: string,
-  ) {
-    // The signIn method handles the validation and token generation
-    const result = await this.authService.signIn(username, password);
+  // Change to accept the LoginDto object
+  async login(@Body() loginDto: LoginDto) {
+    // Pass the DTO object directly to the service method
+    const result = await this.authService.signIn(loginDto);
     return result;
   }
-  // END NEW ENDPOINT -->
 }
