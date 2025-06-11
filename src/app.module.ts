@@ -1,28 +1,37 @@
-// src/app.module.ts (CORRECT STATE)
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { QuizModule } from './quiz/quiz.module';
+import { AuthModule } from './auth/auth.module';
 import { User } from './quiz/entities/user.entity';
-import { AuthModule } from './auth/auth.module'; // This is correct
 import { Question } from './quiz/entities/question.entity';
 import { StudentResponse } from './quiz/entities/student-response.entity';
 import { Option } from './quiz/entities/option.entity';
-import * as path from 'path';
+
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: 'db.sqlite',
-      entities: [User, Question, Option, StudentResponse],
-      synchronize: true,
-      migrations: [path.join(__dirname, 'migrations', '**', '*.ts')],
-      migrationsRun: false,
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        type: 'postgres',
+        url: configService.get<string>('DATABASE_URL'), // <--- CORRECTED: Just the variable name 'DATABASE_URL'
+        entities: [User, Question, Option, StudentResponse],
+        synchronize: true,
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      }),
     }),
     QuizModule,
-    AuthModule, // This is how AuthModule is brought into the app
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
