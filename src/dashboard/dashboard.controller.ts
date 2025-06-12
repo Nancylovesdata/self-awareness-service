@@ -3,7 +3,10 @@ import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Import your JWT guard
 import { RolesGuard } from '../auth/roles.guard'; // Import your Roles guard
 import { Roles } from '../auth/roles.decorator'; // Import your Roles decorator
+import { Role } from '../auth/enums/role.enum'; // <--- Ensure this is imported
 import { User } from '../auth/entities/user.entity'; // Import the dashboard User entity for typing
+// You might also want to import DashboardService if you use it later for logic
+// import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
 export class DashboardController {
@@ -24,7 +27,7 @@ export class DashboardController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard) // Requires valid JWT AND specific role
-  @Roles('admin') // Only users with the 'admin' role can access this route
+  @Roles(Role.Admin) // Only users with the 'admin' role can access this route
   @Get('admin-data')
   getAdminData(@Request() req: { user: User }) {
     return {
@@ -33,7 +36,7 @@ export class DashboardController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard) // Requires valid JWT AND specific role
-  @Roles('user') // Only users with the 'user' role can access this route
+  @Roles(Role.Admin, Role.User) // <--- CORRECTED LINE: Allow both Admin and User roles
   @Get('user-data')
   getUserData(@Request() req: { user: User }) {
     return {

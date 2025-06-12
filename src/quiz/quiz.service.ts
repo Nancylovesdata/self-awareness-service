@@ -6,7 +6,6 @@ import { Repository } from 'typeorm';
 import { Question } from './entities/question.entity';
 import { StudentResponse } from './entities/student-response.entity';
 import { Option } from './entities/option.entity';
-// import { User } from './entities/user.entity'; // Keep this line commented if you removed User dependency
 import { QuizSubmission } from './entities/quiz-submission.entity';
 
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
@@ -34,8 +33,6 @@ export class QuizService {
     private studentResponseRepository: Repository<StudentResponse>,
     @InjectRepository(Option)
     private optionRepository: Repository<Option>,
-    // @InjectRepository(User) // Keep this line commented if you removed User dependency
-    // private userRepository: Repository<User>, // Keep this line commented if you removed User dependency
     @InjectRepository(QuizSubmission)
     private quizSubmissionRepository: Repository<QuizSubmission>,
   ) {}
@@ -49,7 +46,6 @@ export class QuizService {
   async submitAnswers(
     submitAnswersDto: SubmitAnswersDto,
   ): Promise<FullQuizSubmissionResponse> {
-    // <-- Use the new type here
     console.log('--- Inside QuizService submitAnswers method ---');
     console.log('Received DTO:', submitAnswersDto);
 
@@ -107,7 +103,7 @@ export class QuizService {
 
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
-      phoneNumber: phoneNumber, // PhoneNumber is saved to DB, but not returned
+      phoneNumber: phoneNumber,
       scores: scores,
       publicSpeakingPersonalityType: personalityType,
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
@@ -124,14 +120,13 @@ export class QuizService {
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
       userName: userName,
       submissionId: savedQuizSubmission.submissionId,
-      submissionDate: savedQuizSubmission.submissionDate.toISOString(), // <-- ADDED: submissionDate
+      submissionDate: savedQuizSubmission.submissionDate.toISOString(),
     };
   }
 
   async getQuizSubmissionById(
     submissionId: string,
   ): Promise<FullQuizSubmissionResponse> {
-    // <-- Use the new type here
     const submission = await this.quizSubmissionRepository.findOne({
       where: { submissionId },
     });
@@ -149,8 +144,23 @@ export class QuizService {
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
-      // phoneNumber: submission.phoneNumber, // <-- REMOVED: phoneNumber
       submissionDate: submission.submissionDate.toISOString(),
     };
+  }
+
+  // --- NEW METHOD TO FIND ALL SUBMISSIONS ---
+  async findAllQuizSubmissions(): Promise<FullQuizSubmissionResponse[]> {
+    const submissions = await this.quizSubmissionRepository.find();
+
+    // Map each QuizSubmission entity to the FullQuizSubmissionResponse type
+    return submissions.map((submission) => ({
+      submissionId: submission.submissionId,
+      scores: submission.scores,
+      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
+      publicSpeakingPersonalityMeaning:
+        submission.publicSpeakingPersonalityMeaning,
+      userName: submission.userName,
+      submissionDate: submission.submissionDate.toISOString(),
+    }));
   }
 }
