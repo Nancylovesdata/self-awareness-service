@@ -1,36 +1,24 @@
 // src/auth/auth.controller.ts
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  // UnauthorizedException, // This is not needed here as the service throws it
-} from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from '../quiz/dto/register.dto'; // <-- Import your RegisterDto
-import { LoginDto } from '../quiz/dto/login.dto'; // <-- Import your LoginDto
+import { RegisterDto } from '../quiz/dto/register.dto'; // Ensure correct path
+import { LoginDto } from '../quiz/dto/login.dto'; // Ensure correct path
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
-  @Post('signup')
+  @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  // Change to accept the RegisterDto object
-  async signUp(@Body() registerDto: RegisterDto) {
-    // Pass the DTO object directly to the service method
-    const user = await this.authService.registerUser(registerDto);
-    const { password: _, ...result } = user;
-    return result;
+  async register(@Body() registerDto: RegisterDto) {
+    // --- CHANGE HERE: Renamed method from registerUser to register ---
+    return this.authService.register(registerDto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  // Change to accept the LoginDto object
   async login(@Body() loginDto: LoginDto) {
-    // Pass the DTO object directly to the service method
-    const result = await this.authService.signIn(loginDto);
-    return result;
+    // --- CHANGE HERE: Renamed method from signIn to login ---
+    return this.authService.login(loginDto);
   }
 }

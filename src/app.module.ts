@@ -5,11 +5,17 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { QuizModule } from './quiz/quiz.module';
 import { AuthModule } from './auth/auth.module';
-import { User } from './quiz/entities/user.entity';
+import { DashboardModule } from './dashboard/dashboard.module'; // <-- NEW: Import DashboardModule
+
+// Alias the existing User entity (for quiz takers)
+import { User as QuizTakerUser } from './quiz/entities/user.entity';
+// Import and alias the NEW User entity (for dashboard users)
+import { User as DashboardUser } from './auth/entities/user.entity';
+
 import { Question } from './quiz/entities/question.entity';
 import { StudentResponse } from './quiz/entities/student-response.entity';
 import { Option } from './quiz/entities/option.entity';
-import { QuizSubmission } from './quiz/entities/quiz-submission.entity'; // <-- NEW: Import QuizSubmission
+import { QuizSubmission } from './quiz/entities/quiz-submission.entity';
 
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -24,8 +30,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       useFactory: async (configService: ConfigService) => ({
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
-        entities: [User, Question, Option, StudentResponse, QuizSubmission], // <-- ADD QuizSubmission HERE!
-        synchronize: false, // <-- CRITICAL CHANGE: Set to false for migrations!
+        entities: [
+          QuizTakerUser,
+          DashboardUser,
+          Question,
+          Option,
+          StudentResponse,
+          QuizSubmission,
+        ],
+        synchronize: false,
         ssl: {
           rejectUnauthorized: false,
         },
@@ -33,6 +46,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
     QuizModule,
     AuthModule,
+    DashboardModule, // <-- NEW: Add DashboardModule here
   ],
   controllers: [AppController],
   providers: [AppService],

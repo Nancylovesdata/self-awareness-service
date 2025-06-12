@@ -1,58 +1,68 @@
-// src/auth/jwt.strategy.ts (With debugging logs)
+// src/auth/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, ExtractJwt } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config'; // <-- NEW: Import ConfigService
 import { AuthService } from './auth.service';
 
+// Define the structure of your JWT payload
+interface JwtPayload {
+  username: string; // <-- This is what we expect for dashboard users
+  sub: number; // User ID
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private authService: AuthService) {
+// --- IMPORTANT CHANGE: Add 'jwt' as the strategy name ---
+export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService, // <-- NEW: Inject ConfigService
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'YOUR_SECRET_KEY', // <--- THIS SECRET MUST MATCH JWTModule's secret
+      ignoreExpiration: false, // Passport will handle expiration automatically based on 'exp' in payload
+      // --- IMPORTANT CHANGE: Get secret from ConfigService ---
+      secretOrKey: configService.get<string>('JWT_SECRET'),
     });
   }
 
-  async validate(payload: any) {
-    console.log('--- Inside JwtStrategy validate method ---');
-    console.log('Received payload:', payload);
+  // This method is called after the JWT is validated (signature and expiration)
+  // The 'payload' is the decoded JWT payload
+  async validate(payload: JwtPayload) {
+    // <-- NEW: Use JwtPayload type
+    // console.log('--- Inside JwtStrategy validate method ---'); // Debugging - can remove later
+    // console.log('Received payload:', payload); // Debugging - can remove later
 
-    const currentTime = Date.now() / 1000;
-    if (payload.exp && payload.exp < currentTime) {
-      console.log(
-        'Token has expired! Expiration time:',
-        payload.exp,
-        'Current time:',
-        currentTime,
-      );
-      throw new UnauthorizedException('Token expired');
-    } else if (payload.exp) {
-      console.log(
-        'Token is still valid. Expires at:',
-        payload.exp,
-        'Current time:',
-        currentTime,
-      );
-    }
+    // --- REMOVE: Manual expiration check is handled by ignoreExpiration: false ---
+    // const currentTime = Date.now() / 1000;
+    // if (payload.exp && payload.exp < currentTime) {
+    //   console.log('Token has expired!');
+    //   throw new UnauthorizedException('Token expired');
+    // } else if (payload.exp) {
+    //   console.log('Token is still valid.');
+    // }
+    // --- END REMOVE ---
 
-    const user = await this.authService.findOne(payload.email); // Or findById(payload.sub) if you prefer
+    // --- IMPORTANT CHANGE: Use authService.validateUser with payload.username ---
+    const user = await this.authService.validateUser(payload.username);
 
-    console.log('User found in DB:', user ? user.email : 'None');
+    // console.log('User found in DB:', user ? user.username : 'None'); // Debugging - can remove later
 
     if (!user) {
-      console.log(
-        'User not found in DB based on payload email:',
-        payload.email,
-      );
-      throw new UnauthorizedException('User not found');
+      // console.log('User not found in DB based on payload username:', payload.username); // Debugging - can remove later
+      throw new UnauthorizedException('Invalid token or user not found.');
     }
 
-    const { password, ...result } = user;
+    // It's good practice to ensure the password hash is not returned with the user object
+    // when it's attached to the request.
+    delete user.password;
 
-    console.log('Validated user (without password):', result);
-    console.log('--- End JwtStrategy validate method ---');
+    // console.log('Validated user (without password):', user); // Debugging - can remove later
+    // console.log('--- End JwtStrategy validate method ---'); // Debugging - can remove later
 
-    return result; // This 'result' object will be attached to req.user
+    return user; // This 'user' object will be attached to req.user
   }
 }

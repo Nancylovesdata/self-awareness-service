@@ -6,54 +6,64 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../quiz/entities/user.entity'; // Adjust path if @app/quiz/entities/user.entity is correct
+// --- IMPORTANT CHANGE HERE ---
+// Import the NEW Dashboard User entity from its correct path
+import { User } from './entities/user.entity'; // This is the dashboard user entity
+// --- END IMPORTANT CHANGE ---
+
+// --- IMPORTANT CHANGE HERE ---
+// Import DTOs from the new 'src/auth/dto' folder
 import { RegisterDto } from '../quiz/dto/register.dto';
 import { LoginDto } from '../quiz/dto/login.dto';
-import * as bcrypt from 'bcryptjs';
+// --- END IMPORTANT CHANGE ---
+
+// Use bcrypt (the one we installed) for consistency and potential native performance
+import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
+    @InjectRepository(User) // This now refers to the Dashboard User entity
     private usersRepository: Repository<User>,
     private jwtService: JwtService,
   ) {}
 
-  async registerUser(registerDto: RegisterDto): Promise<User> {
-    const { email, password, fullName, phoneNumber } = registerDto;
+  // Renamed to register for dashboard users, using username and role
+  async register(registerDto: RegisterDto): Promise<User> {
+    const { username, password, role } = registerDto; // Now expects username and role
 
     const existingUser = await this.usersRepository.findOne({
-      where: { email },
+      where: { username }, // Check by username
     });
     if (existingUser) {
-      throw new ConflictException('Email already taken.');
+      throw new ConflictException('Username already taken.');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = this.usersRepository.create({
-      email,
+      username,
       password: hashedPassword,
-      fullName,
-      phoneNumber,
+      role: role || 'user', // Default to 'user' if not provided
     });
     const savedUser = await this.usersRepository.save(newUser);
 
     // It's good practice to not return the password hash
     delete savedUser.password;
-    return savedUser; // <-- RETURN ADDED HERE
+    return savedUser;
   }
 
-  // --- ADD THIS findOne METHOD ---
-  async findOne(email: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({ where: { email } });
+  // This method will be used by JwtStrategy to validate the user from token payload
+  async validateUser(username: string): Promise<User | undefined> {
+    return this.usersRepository.findOne({ where: { username } });
   }
-  // -------------------------------
 
-  async signIn(loginDto: LoginDto): Promise<{ access_token: string }> {
-    const { email, password } = loginDto;
-    const user = await this.usersRepository.findOne({ where: { email } });
+  // Renamed to login for dashboard users, using username
+  async login(loginDto: LoginDto): Promise<{ accessToken: string }> {
+    // Changed access_token to accessToken for consistency with NestJS JWT common practice
+    const { username, password } = loginDto; // Now expects username
+    const user = await this.usersRepository.findOne({ where: { username } }); // Find by username
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials.');
@@ -64,16 +74,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
-    // Generate JWT payload
+    // Generate JWT payload for dashboard user
     const payload = {
-      email: user.email,
-      sub: user.id, // Subject often refers to the user ID
-      fullName: user.fullName,
-      // You can add more data to the payload if needed
+      username: user.username,
+      sub: user.id, // Subject refers to the user ID
+      role: user.role, // Include role in the payload for authorization
     };
 
     return {
-      access_token: this.jwtService.sign(payload), // <-- RETURN ADDED HERE
+      accessToken: this.jwtService.sign(payload),
     };
   }
 }
