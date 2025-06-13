@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // src/database/seeds/questions.seeder.ts
 import { DataSource } from 'typeorm';
 import { Question } from '@app/quiz/entities/question.entity';

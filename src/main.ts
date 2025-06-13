@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@app/app.module';
@@ -9,8 +10,13 @@ import { DataSource } from 'typeorm';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // IMPORTANT: Update CORS origin to allow both frontend domains
   app.enableCors({
-    origin: 'http://localhost:4200',
+    origin: [
+      'http://localhost:4200',
+      'https://qknowext-dashboard.web.app',
+      'https://qknowext.web.app',
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
