@@ -18,8 +18,6 @@ type FullQuizSubmissionResponse = QuizResultDto & {
   userName: string;
   phoneNumber: string;
   quizTitle: string;
-  // NEW: Add a field for combined meaning string if ties exist
-  combinedPublicSpeakingPersonalityMeaning?: string;
 };
 
 @Injectable()
@@ -43,17 +41,13 @@ export class QuizService {
   ) {}
 
   async getQuestions(): Promise<Question[]> {
-    // --- START OF CHANGES FOR OPTION ORDERING ---
     const questions = await this.questionRepository.find({
       relations: ['options'],
-      // You can try ordering by question ID directly in the query for consistency
       order: {
-        id: 'ASC',
+        id: 'ASC', // Order questions by ID
       },
     });
 
-    // Manually sort options within each question to ensure ascending ID order
-    // This is robust as TypeORM's `order` for nested relations can be tricky sometimes
     questions.forEach((question) => {
       if (question.options && Array.isArray(question.options)) {
         question.options.sort((a, b) => a.id - b.id);
@@ -61,7 +55,6 @@ export class QuizService {
     });
 
     return questions;
-    // --- END OF CHANGES FOR OPTION ORDERING ---
   }
 
   async submitAnswers(
@@ -113,11 +106,9 @@ export class QuizService {
 
     await this.studentResponseRepository.save(savedResponses);
 
-    // --- START OF CHANGES FOR TIE HANDLING & COMBINED MEANING ---
     let maxScore = -1;
     for (const type in scores) {
       if (scores.hasOwnProperty(type)) {
-        // Ensure it's an own property, not from prototype chain
         if (scores[type as keyof typeof scores] > maxScore) {
           maxScore = scores[type as keyof typeof scores];
         }
@@ -131,7 +122,6 @@ export class QuizService {
     }[] = [];
     for (const type in scores) {
       if (scores.hasOwnProperty(type)) {
-        // Ensure it's an own property
         if (scores[type as keyof typeof scores] === maxScore) {
           tiedPersonalityDetails.push({
             type: type,
@@ -142,50 +132,45 @@ export class QuizService {
       }
     }
 
-    // Sort tied types alphabetically by type for consistent display
     tiedPersonalityDetails.sort((a, b) => a.type.localeCompare(b.type));
 
-    // Determine the single primary type for database storage (first in sorted tied list)
-    const primaryPersonalityType =
-      tiedPersonalityDetails.length > 0
-        ? tiedPersonalityDetails[0].type
-        : 'Unknown';
-    const primaryPersonalityMeaning =
-      tiedPersonalityDetails.length > 0
-        ? tiedPersonalityDetails[0].meaning
-        : 'Unknown';
+    let finalPersonalityType: string;
+    let finalPersonalityMeaning: string;
 
-    // Generate the combined meaning string for the response
-    let combinedMeaningString: string;
     if (tiedPersonalityDetails.length > 1) {
-      combinedMeaningString = tiedPersonalityDetails
+      // If there's a tie, combine the types with a FORWARD SLASH '/'
+      finalPersonalityType = tiedPersonalityDetails
+        .map((t) => t.type)
+        .join('/'); // <--- CHANGE IS HERE (back to '/')
+      // If there's a tie, combine the meanings with ' and '
+      finalPersonalityMeaning = tiedPersonalityDetails
         .map((t) => t.meaning)
         .join(' and ');
     } else if (tiedPersonalityDetails.length === 1) {
-      combinedMeaningString = tiedPersonalityDetails[0].meaning;
+      finalPersonalityType = tiedPersonalityDetails[0].type;
+      finalPersonalityMeaning = tiedPersonalityDetails[0].meaning;
     } else {
-      combinedMeaningString = 'Unknown';
+      finalPersonalityType = 'Unknown';
+      finalPersonalityMeaning = 'Unknown';
     }
 
     console.log('Calculated Scores:', scores);
     console.log(
-      'Determined Primary Personality Type (for DB):',
-      primaryPersonalityType,
+      'Final Personality Type (including ties):',
+      finalPersonalityType,
     );
     console.log(
-      'Combined Personality Meaning (for response):',
-      combinedMeaningString,
+      'Final Personality Meaning (including ties):',
+      finalPersonalityMeaning,
     );
-    // --- END OF CHANGES FOR TIE HANDLING & COMBINED MEANING ---
 
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
       phoneNumber: phoneNumber,
       quizTitle: quizTitle,
       scores: scores,
-      // Store the primary type/meaning in the entity as per existing schema
-      publicSpeakingPersonalityType: primaryPersonalityType,
-      publicSpeakingPersonalityMeaning: primaryPersonalityMeaning,
+      publicSpeakingPersonalityType: finalPersonalityType,
+      publicSpeakingPersonalityMeaning: finalPersonalityMeaning,
     });
 
     const savedQuizSubmission =
@@ -195,14 +180,13 @@ export class QuizService {
 
     return {
       scores: scores as { A: number; D: number; N: number; C: number },
-      publicSpeakingPersonalityType: primaryPersonalityType, // This will be the primary one saved to DB
-      publicSpeakingPersonalityMeaning: primaryPersonalityMeaning, // This will be the primary one saved to DB
+      publicSpeakingPersonalityType: finalPersonalityType,
+      publicSpeakingPersonalityMeaning: finalPersonalityMeaning,
       userName: userName,
       phoneNumber: phoneNumber,
       quizTitle: quizTitle,
       submissionId: savedQuizSubmission.submissionId,
       submissionDate: savedQuizSubmission.submissionDate.toISOString(),
-      combinedPublicSpeakingPersonalityMeaning: combinedMeaningString, // <--- NEW FIELD IN RESPONSE
     };
   }
 
@@ -219,54 +203,12 @@ export class QuizService {
       );
     }
 
-    // --- RE-CALCULATE TIED MEANING FOR RETRIEVED SUBMISSION ---
-    const scores: { A: number; D: number; N: number; C: number } =
-      submission.scores;
-    let maxScore = -1;
-    for (const type in scores) {
-      if (scores.hasOwnProperty(type)) {
-        if (scores[type as keyof typeof scores] > maxScore) {
-          maxScore = scores[type as keyof typeof scores];
-        }
-      }
-    }
-    const tiedPersonalityDetails: {
-      type: string;
-      meaning: string;
-      score: number;
-    }[] = [];
-    for (const type in scores) {
-      if (scores.hasOwnProperty(type)) {
-        if (scores[type as keyof typeof scores] === maxScore) {
-          tiedPersonalityDetails.push({
-            type: type,
-            score: maxScore,
-            meaning: this.letterMeanings[type] || 'Unknown Meaning',
-          });
-        }
-      }
-    }
-    tiedPersonalityDetails.sort((a, b) => a.type.localeCompare(b.type));
-
-    let combinedMeaningString: string;
-    if (tiedPersonalityDetails.length > 1) {
-      combinedMeaningString = tiedPersonalityDetails
-        .map((t) => t.meaning)
-        .join(' and ');
-    } else if (tiedPersonalityDetails.length === 1) {
-      combinedMeaningString = tiedPersonalityDetails[0].meaning;
-    } else {
-      combinedMeaningString = 'Unknown';
-    }
-    // --- END OF RE-CALCULATION ---
-
     return {
       submissionId: submission.submissionId,
       scores: submission.scores,
       publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
-      combinedPublicSpeakingPersonalityMeaning: combinedMeaningString, // <--- NEW FIELD IN RESPONSE
       userName: submission.userName,
       phoneNumber: submission.phoneNumber,
       quizTitle: submission.quizTitle,
@@ -275,68 +217,22 @@ export class QuizService {
   }
 
   async findAllQuizSubmissions(): Promise<FullQuizSubmissionResponse[]> {
-    // --- START OF CHANGES FOR ORDER ---
     const submissions = await this.quizSubmissionRepository.find({
       order: {
         submissionDate: 'DESC', // Order by submissionDate in descending order (newest first)
       },
     });
-    // --- END OF CHANGES FOR ORDER ---
 
-    return submissions.map((submission) => {
-      // --- RE-CALCULATE TIED MEANING FOR EACH SUBMISSION IN THE LIST ---
-      const scores: { A: number; D: number; N: number; C: number } =
-        submission.scores;
-      let maxScore = -1;
-      for (const type in scores) {
-        if (scores.hasOwnProperty(type)) {
-          if (scores[type as keyof typeof scores] > maxScore) {
-            maxScore = scores[type as keyof typeof scores];
-          }
-        }
-      }
-      const tiedPersonalityDetails: {
-        type: string;
-        meaning: string;
-        score: number;
-      }[] = [];
-      for (const type in scores) {
-        if (scores.hasOwnProperty(type)) {
-          if (scores[type as keyof typeof scores] === maxScore) {
-            tiedPersonalityDetails.push({
-              type: type,
-              score: maxScore,
-              meaning: this.letterMeanings[type] || 'Unknown Meaning',
-            });
-          }
-        }
-      }
-      tiedPersonalityDetails.sort((a, b) => a.type.localeCompare(b.type));
-
-      let combinedMeaningString: string;
-      if (tiedPersonalityDetails.length > 1) {
-        combinedMeaningString = tiedPersonalityDetails
-          .map((t) => t.meaning)
-          .join(' and ');
-      } else if (tiedPersonalityDetails.length === 1) {
-        combinedMeaningString = tiedPersonalityDetails[0].meaning;
-      } else {
-        combinedMeaningString = 'Unknown';
-      }
-      // --- END OF RE-CALCULATION ---
-
-      return {
-        submissionId: submission.submissionId,
-        scores: submission.scores,
-        publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
-        publicSpeakingPersonalityMeaning:
-          submission.publicSpeakingPersonalityMeaning,
-        combinedPublicSpeakingPersonalityMeaning: combinedMeaningString, // <--- NEW FIELD IN RESPONSE
-        userName: submission.userName,
-        phoneNumber: submission.phoneNumber,
-        quizTitle: submission.quizTitle,
-        submissionDate: submission.submissionDate.toISOString(),
-      };
-    });
+    return submissions.map((submission) => ({
+      submissionId: submission.submissionId,
+      scores: submission.scores,
+      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
+      publicSpeakingPersonalityMeaning:
+        submission.publicSpeakingPersonalityMeaning,
+      userName: submission.userName,
+      phoneNumber: submission.phoneNumber,
+      quizTitle: submission.quizTitle,
+      submissionDate: submission.submissionDate.toISOString(),
+    }));
   }
 }
