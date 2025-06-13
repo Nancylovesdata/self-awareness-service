@@ -6,19 +6,18 @@ import { Repository } from 'typeorm';
 import { Question } from './entities/question.entity';
 import { StudentResponse } from './entities/student-response.entity';
 import { Option } from './entities/option.entity';
-import { QuizSubmission } from './entities/quiz-submission.entity';
+import { QuizSubmission } from './entities/quiz-submission.entity'; // Your entity file
 
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
 import { QuizResultDto } from './dto/quiz-result.dto';
 
 // Define a new type for the full quiz submission response to be explicit
-// <--- MODIFIED / ADDED: Include userName, phoneNumber, and quizTitle in the response type
 type FullQuizSubmissionResponse = QuizResultDto & {
   submissionId: string;
   submissionDate: string;
-  userName: string; // MODIFIED: Added to type
-  phoneNumber: string; // MODIFIED: Added to type
-  quizTitle: string; // MODIFIED: Added to type
+  userName: string;
+  phoneNumber: string;
+  quizTitle: string;
 };
 
 @Injectable()
@@ -53,7 +52,6 @@ export class QuizService {
     console.log('--- Inside QuizService submitAnswers method ---');
     console.log('Received DTO:', submitAnswersDto);
 
-    // <--- MODIFIED: Destructure quizTitle from submitAnswersDto
     const { answers, userName, phoneNumber, quizTitle } = submitAnswersDto;
 
     const scores: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
@@ -109,8 +107,8 @@ export class QuizService {
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
       phoneNumber: phoneNumber,
-      quizTitle: quizTitle, // <--- ADDED: Save quizTitle to the submission
-      scores: scores,
+      quizTitle: quizTitle,
+      scores: scores, // <--- REVERTED: No JSON.stringify here. Entity transformer handles it.
       publicSpeakingPersonalityType: personalityType,
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
     });
@@ -125,8 +123,8 @@ export class QuizService {
       publicSpeakingPersonalityType: personalityType,
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
       userName: userName,
-      phoneNumber: phoneNumber, // <--- MODIFIED: Include phoneNumber in response
-      quizTitle: quizTitle, // <--- MODIFIED: Include quizTitle in response
+      phoneNumber: phoneNumber,
+      quizTitle: quizTitle,
       submissionId: savedQuizSubmission.submissionId,
       submissionDate: savedQuizSubmission.submissionDate.toISOString(),
     };
@@ -147,31 +145,29 @@ export class QuizService {
 
     return {
       submissionId: submission.submissionId,
-      scores: submission.scores,
+      scores: submission.scores, // <--- REVERTED: No JSON.parse here. Entity transformer handles it.
       publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
-      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in response
-      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in response
+      phoneNumber: submission.phoneNumber,
+      quizTitle: submission.quizTitle,
       submissionDate: submission.submissionDate.toISOString(),
     };
   }
 
-  // --- NEW METHOD TO FIND ALL SUBMISSIONS ---
   async findAllQuizSubmissions(): Promise<FullQuizSubmissionResponse[]> {
     const submissions = await this.quizSubmissionRepository.find();
 
-    // Map each QuizSubmission entity to the FullQuizSubmissionResponse type
     return submissions.map((submission) => ({
       submissionId: submission.submissionId,
-      scores: submission.scores,
+      scores: submission.scores, // <--- REVERTED: No JSON.parse here. Entity transformer handles it.
       publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
-      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in mapped response
-      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in mapped response
+      phoneNumber: submission.phoneNumber,
+      quizTitle: submission.quizTitle,
       submissionDate: submission.submissionDate.toISOString(),
     }));
   }
