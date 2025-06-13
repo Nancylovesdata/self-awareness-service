@@ -11,12 +11,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // IMPORTANT: Update CORS origin to allow both frontend domains
+ // Split the string by comma and trim any whitespace from each origin
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:4200']; // Fallback for development if not set
+
   app.enableCors({
-    origin: [
-      'http://localhost:4200',
-      'https://qknowext-dashboard.web.app',
-      'https://qknowext.web.app',
-    ],
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
