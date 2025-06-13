@@ -9,20 +9,18 @@ import { DataSource } from 'typeorm';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // --- ADD THIS CORS CONFIGURATION HERE ---
   app.enableCors({
-    origin: 'http://localhost:4200', // This allows requests from your frontend's local development server
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Adjust methods as per your API needs
-    credentials: true, // Set to true if your frontend needs to send cookies or authorization headers
+    origin: 'http://localhost:4200',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
   });
-  // --- END CORS CONFIGURATION ---
 
   const dataSource = app.get(getDataSourceToken());
   await seedQuestions(dataSource);
 
-  // IMPORTANT: For Render deployment, you should use process.env.PORT
-  // app.listen(process.env.PORT || 3000)
-  await app.listen(3000); // If 3000 is directly used on Render, it might cause issues. Recommend process.env.PORT
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

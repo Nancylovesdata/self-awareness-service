@@ -1,11 +1,10 @@
 // src/quiz/dto/submit-answers.dto.ts
-
 import {
   IsArray,
   IsNumber,
   IsString,
   ValidateNested,
-  IsOptional,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -24,8 +23,13 @@ export class SubmitAnswersDto {
   answers: AnswerDto[];
 
   @IsString()
-  userName: string; // Changed from fullName to userName
+  userName: string;
 
   @IsString()
-  phoneNumber: string; // Added phoneNumber
+  phoneNumber: string;
+
+  // Added quiz title
+  @IsNotEmpty()
+  @IsString()
+  quizTitle: string;
 }

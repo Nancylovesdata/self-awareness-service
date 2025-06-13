@@ -6,32 +6,23 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-// --- IMPORTANT CHANGE HERE ---
-// Import the NEW Dashboard User entity from its correct path
-import { User } from './entities/user.entity'; // This is the dashboard user entity
-// --- END IMPORTANT CHANGE ---
-
-// --- IMPORTANT CHANGE HERE ---
-// Import DTOs from the new 'src/auth/dto' folder
+import { User } from './entities/user.entity';
 import { RegisterDto } from '../quiz/dto/register.dto';
 import { LoginDto } from '../quiz/dto/login.dto';
-// --- END IMPORTANT CHANGE ---
-
-// Use bcrypt (the one we installed) for consistency and potential native performance
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User) // This now refers to the Dashboard User entity
+    @InjectRepository(User) // Dashboard User entity
     private usersRepository: Repository<User>,
     private jwtService: JwtService,
   ) {}
 
   // Renamed to register for dashboard users, using username and role
   async register(registerDto: RegisterDto): Promise<User> {
-    const { username, password, role } = registerDto; // Now expects username and role
+    const { username, password, role } = registerDto;
 
     const existingUser = await this.usersRepository.findOne({
       where: { username }, // Check by username
@@ -54,16 +45,14 @@ export class AuthService {
     return savedUser;
   }
 
-  // This method will be used by JwtStrategy to validate the user from token payload
+  //  JwtStrategy to validate the user from token payload
   async validateUser(username: string): Promise<User | undefined> {
     return this.usersRepository.findOne({ where: { username } });
   }
 
-  // Renamed to login for dashboard users, using username
   async login(loginDto: LoginDto): Promise<{ accessToken: string }> {
-    // Changed access_token to accessToken for consistency with NestJS JWT common practice
     const { username, password } = loginDto; // Now expects username
-    const user = await this.usersRepository.findOne({ where: { username } }); // Find by username
+    const user = await this.usersRepository.findOne({ where: { username } });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials.');
@@ -77,8 +66,8 @@ export class AuthService {
     // Generate JWT payload for dashboard user
     const payload = {
       username: user.username,
-      sub: user.id, // Subject refers to the user ID
-      role: user.role, // Include role in the payload for authorization
+      sub: user.id,
+      role: user.role,
     };
 
     return {

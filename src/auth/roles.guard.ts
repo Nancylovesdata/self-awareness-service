@@ -1,10 +1,9 @@
 // src/auth/roles.guard.ts
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from './roles.decorator'; // <--- CORRECTED PATH: ./roles.decorator
-import { Role } from './enums/role.enum'; // <--- CORRECTED PATH: ./enums/role.enum
-import { User as DashboardUser } from './entities/user.entity'; // <--- CORRECTED PATH: ./entities/user.entity
-
+import { ROLES_KEY } from './roles.decorator';
+import { Role } from './enums/role.enum';
+import { User as DashboardUser } from './entities/user.entity';
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}

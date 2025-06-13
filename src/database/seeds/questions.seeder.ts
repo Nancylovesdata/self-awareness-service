@@ -1,7 +1,7 @@
 // src/database/seeds/questions.seeder.ts
 import { DataSource } from 'typeorm';
 import { Question } from '@app/quiz/entities/question.entity';
-import { Option } from '@app/quiz/entities/option.entity'; // <-- Import the new Option entity
+import { Option } from '@app/quiz/entities/option.entity';
 
 export const seedQuestions = async (dataSource: DataSource) => {
   const questionRepository = dataSource.getRepository(Question);

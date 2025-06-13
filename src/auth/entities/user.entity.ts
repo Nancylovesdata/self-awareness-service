@@ -1,17 +1,18 @@
 // src/auth/entities/user.entity.ts
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-@Entity('dashboard_users') // You can name the table 'users' or 'dashboard_users'
+@Entity('dashboard_users')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true }) // Username should be unique
+  @Column({ unique: true })
   username: string;
 
   @Column()
-  password: string; // This will store the HASHED password
+  password: string;
 
-  @Column({ default: 'user' }) // You can add a 'role' column (e.g., 'admin', 'user')
+  // 'role' column (e.g., 'admin', 'user')
+  @Column({ default: 'user' })
   role: string;
 }

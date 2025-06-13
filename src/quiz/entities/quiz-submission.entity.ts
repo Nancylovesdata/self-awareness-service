@@ -2,12 +2,12 @@
 
 import {
   Entity,
-  PrimaryColumn,
+  PrimaryColumn, // Keep PrimaryColumn
   Column,
   CreateDateColumn,
-  BeforeInsert,
+  BeforeInsert, // Keep BeforeInsert
 } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid'; // Keep uuidv4 import
 
 @Entity('quiz_submissions')
 export class QuizSubmission {
@@ -19,18 +19,21 @@ export class QuizSubmission {
 
   @Column()
   phoneNumber: string;
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }) // <-- Changed 'datetime' to 'timestamp'
+
+  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   submissionDate: Date;
-  // --- CHANGE THIS LINE FOR SCORES ---
+
   @Column({ type: 'text' }) // Changed 'jsonb' to 'text' for SQLite compatibility
   scores: { A: number; D: number; N: number; C: number };
-  // --- END CHANGE ---
 
   @Column()
   publicSpeakingPersonalityType: string;
 
   @Column()
   publicSpeakingPersonalityMeaning: string;
+
+  @Column() // <--- ADD THIS LINE: quizTitle column
+  quizTitle: string; // <--- ADD THIS LINE: quizTitle property
 
   @BeforeInsert()
   generateSubmissionId() {

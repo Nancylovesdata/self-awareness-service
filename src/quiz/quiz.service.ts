@@ -12,9 +12,13 @@ import { SubmitAnswersDto } from './dto/submit-answers.dto';
 import { QuizResultDto } from './dto/quiz-result.dto';
 
 // Define a new type for the full quiz submission response to be explicit
+// <--- MODIFIED / ADDED: Include userName, phoneNumber, and quizTitle in the response type
 type FullQuizSubmissionResponse = QuizResultDto & {
   submissionId: string;
-  submissionDate: string; // Add submissionDate to the response type
+  submissionDate: string;
+  userName: string; // MODIFIED: Added to type
+  phoneNumber: string; // MODIFIED: Added to type
+  quizTitle: string; // MODIFIED: Added to type
 };
 
 @Injectable()
@@ -49,7 +53,8 @@ export class QuizService {
     console.log('--- Inside QuizService submitAnswers method ---');
     console.log('Received DTO:', submitAnswersDto);
 
-    const { answers, userName, phoneNumber } = submitAnswersDto;
+    // <--- MODIFIED: Destructure quizTitle from submitAnswersDto
+    const { answers, userName, phoneNumber, quizTitle } = submitAnswersDto;
 
     const scores: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
     const savedResponses: StudentResponse[] = [];
@@ -104,6 +109,7 @@ export class QuizService {
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
       phoneNumber: phoneNumber,
+      quizTitle: quizTitle, // <--- ADDED: Save quizTitle to the submission
       scores: scores,
       publicSpeakingPersonalityType: personalityType,
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
@@ -119,6 +125,8 @@ export class QuizService {
       publicSpeakingPersonalityType: personalityType,
       publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
       userName: userName,
+      phoneNumber: phoneNumber, // <--- MODIFIED: Include phoneNumber in response
+      quizTitle: quizTitle, // <--- MODIFIED: Include quizTitle in response
       submissionId: savedQuizSubmission.submissionId,
       submissionDate: savedQuizSubmission.submissionDate.toISOString(),
     };
@@ -144,6 +152,8 @@ export class QuizService {
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
+      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in response
+      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in response
       submissionDate: submission.submissionDate.toISOString(),
     };
   }
@@ -160,6 +170,8 @@ export class QuizService {
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
+      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in mapped response
+      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in mapped response
       submissionDate: submission.submissionDate.toISOString(),
     }));
   }
