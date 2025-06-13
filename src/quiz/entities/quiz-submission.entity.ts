@@ -3,14 +3,16 @@
 
 import {
   Entity,
-  PrimaryColumn, // Keep PrimaryColumn
+  PrimaryColumn,
   Column,
   CreateDateColumn,
-  BeforeInsert, // Keep BeforeInsert
+  BeforeInsert,
+  OneToMany, // <--- ADDED: Import OneToMany
 } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid'; // Keep uuidv4 import
+import { v4 as uuidv4 } from 'uuid';
+import { StudentResponse } from './student-response.entity'; // <--- ADDED: Import StudentResponse
 
-@Entity('quiz_submissions')
+@Entity('quiz_submissions') // Changed from 'quiz_submission' to 'quiz_submissions' based on common plural naming or your preference
 export class QuizSubmission {
   @PrimaryColumn({ type: 'uuid' })
   submissionId: string;
@@ -24,7 +26,8 @@ export class QuizSubmission {
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   submissionDate: Date;
 
-  @Column({ type: 'text' }) // Changed 'jsonb' to 'text' for SQLite compatibility
+  // Recommended for JSON-like objects in SQLite for automatic serialization/deserialization
+  @Column({ type: 'simple-json' }) // <--- CHANGED: Use 'simple-json' for JSON objects with SQLite
   scores: { A: number; D: number; N: number; C: number };
 
   @Column()
@@ -33,8 +36,20 @@ export class QuizSubmission {
   @Column()
   publicSpeakingPersonalityMeaning: string;
 
-  @Column() // <--- ADD THIS LINE: quizTitle column
-  quizTitle: string; // <--- ADD THIS LINE: quizTitle property
+  @Column()
+  quizTitle: string; // Correctly defined as a Column
+
+  // --- NEW: One-to-Many relationship to StudentResponse ---
+  // This defines that one QuizSubmission can have many StudentResponses.
+  // 'studentResponse => studentResponse.quizSubmission' links to the 'quizSubmission' property in StudentResponse.
+  // 'cascade: true' means that if you save a QuizSubmission, its related StudentResponses will also be saved.
+  // 'onDelete: 'CASCADE'' means that if a QuizSubmission is deleted, all associated StudentResponses will also be deleted by the database.
+  @OneToMany(() => StudentResponse, (studentResponse) => studentResponse.quizSubmission, {
+    cascade: ['insert', 'update'], // Cascade inserts/updates when saving QuizSubmission
+    onDelete: 'CASCADE', // Database-level cascade delete
+    nullable: true, // A submission might not have responses yet if created without them (though less likely in this flow)
+  })
+  studentResponses: StudentResponse[]; // <--- CHANGED: Correctly typed as an array of StudentResponse entities
 
   @BeforeInsert()
   generateSubmissionId() {

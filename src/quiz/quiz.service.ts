@@ -13,13 +13,12 @@ import { SubmitAnswersDto } from './dto/submit-answers.dto';
 import { QuizResultDto } from './dto/quiz-result.dto';
 
 // Define a new type for the full quiz submission response to be explicit
-// <--- MODIFIED / ADDED: Include userName, phoneNumber, and quizTitle in the response type
 type FullQuizSubmissionResponse = QuizResultDto & {
   submissionId: string;
   submissionDate: string;
-  userName: string; // MODIFIED: Added to type
-  phoneNumber: string; // MODIFIED: Added to type
-  quizTitle: string; // MODIFIED: Added to type
+  userName: string;
+  phoneNumber: string;
+  quizTitle: string;
 };
 
 @Injectable()
@@ -57,7 +56,7 @@ export class QuizService {
     const { answers, userName, phoneNumber, quizTitle } = submitAnswersDto;
 
     const scores: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
-    const savedResponses: StudentResponse[] = [];
+    const tempStudentResponses: StudentResponse[] = []; // Store responses temporarily
 
     for (const answer of answers) {
       const question = await this.questionRepository.findOne({
@@ -91,19 +90,17 @@ export class QuizService {
         selectedOption: selectedOption,
         selectedOptionCorrespondence: correspondence,
         timestamp: new Date(),
+        // quizSubmission: null, // This will be set when the parent submission is created/saved
+        // submissionId: '', // This will be set by the parent submission
       });
-      savedResponses.push(studentResponse);
+      tempStudentResponses.push(studentResponse);
     }
 
-    await this.studentResponseRepository.save(savedResponses);
-
-    // --- MODIFIED LOGIC START: Handle ties and generate personality type string ---
     const maxScore = Math.max(...Object.values(scores));
     const highestLetters = Object.keys(scores).filter(
       (letter) => scores[letter] === maxScore,
     );
 
-    // If there's a tie, show all tied letters separated by a slash (e.g., "N/D")
     const publicSpeakingPersonalityType = highestLetters.join('/');
 
     console.log('Calculated Scores:', scores);
@@ -111,36 +108,34 @@ export class QuizService {
       'Determined Personality Type (for response):',
       publicSpeakingPersonalityType,
     );
-    // --- MODIFIED LOGIC END ---
 
-    // Save the full meaning to the database for later retrieval/admin purposes
     const fullMeaningForDb =
       highestLetters
         .map((letter) => this.letterMeanings[letter] || 'Unknown')
         .join('/') || 'Unknown';
 
+    // Create the quiz submission first
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
       phoneNumber: phoneNumber,
       quizTitle: quizTitle,
       scores: scores,
-      // Save the combined personality type (e.g., "N/D")
       publicSpeakingPersonalityType: publicSpeakingPersonalityType,
-      // Save the full meaning for database records, but not for the immediate response to the user
       publicSpeakingPersonalityMeaning: fullMeaningForDb,
+      // Assign the collected student responses to the submission
+      studentResponses: tempStudentResponses, // Assign the created responses here
     });
 
-    const savedQuizSubmission =
-      await this.quizSubmissionRepository.save(quizSubmission);
+    // Save the quiz submission. Due to 'cascade: true' on studentResponses,
+    // the related student responses will also be saved.
+    const savedQuizSubmission = await this.quizSubmissionRepository.save(quizSubmission);
 
     console.log('--- End QuizService submitAnswers method ---');
 
     return {
       scores: scores as { A: number; D: number; N: number; C: number },
-      // Return only the letter(s) as requested
       publicSpeakingPersonalityType: publicSpeakingPersonalityType,
-      // Ensure this is an empty string or removed from DTO for the immediate response
-      publicSpeakingPersonalityMeaning: '', // IMPORTANT: Keep this empty for the immediate response
+      publicSpeakingPersonalityMeaning: '',
       userName: userName,
       phoneNumber: phoneNumber,
       quizTitle: quizTitle,
@@ -154,6 +149,8 @@ export class QuizService {
   ): Promise<FullQuizSubmissionResponse> {
     const submission = await this.quizSubmissionRepository.findOne({
       where: { submissionId },
+      // OPTIONAL: If you want to load student responses with the submission
+      // relations: ['studentResponses'],
     });
 
     if (!submission) {
@@ -162,16 +159,12 @@ export class QuizService {
       );
     }
 
-    // For historical retrieval (e.g., by an admin), you might want to return the full meaning.
-    // However, if this endpoint is also exposed to the user immediately after submission,
-    // you might need to apply the same logic as `submitAnswers` to hide the full meaning.
-    // Assuming this might be for internal/admin retrieval or later use where full meaning is allowed:
     return {
       submissionId: submission.submissionId,
       scores: submission.scores,
-      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType, // This will be N/D if saved as such
+      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
       publicSpeakingPersonalityMeaning:
-        submission.publicSpeakingPersonalityMeaning, // This will have the full meaning if saved as such
+        submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
       phoneNumber: submission.phoneNumber,
       quizTitle: submission.quizTitle,
@@ -179,9 +172,11 @@ export class QuizService {
     };
   }
 
-  // --- NEW METHOD TO FIND ALL SUBMISSIONS ---
   async findAllQuizSubmissions(): Promise<FullQuizSubmissionResponse[]> {
-    const submissions = await this.quizSubmissionRepository.find();
+    const submissions = await this.quizSubmissionRepository.find({
+      // OPTIONAL: If you want to load student responses with all submissions
+      // relations: ['studentResponses'],
+    });
 
     return submissions.map((submission) => ({
       submissionId: submission.submissionId,
@@ -194,5 +189,46 @@ export class QuizService {
       quizTitle: submission.quizTitle,
       submissionDate: submission.submissionDate.toISOString(),
     }));
+  }
+
+  /**
+   * Deletes a single quiz submission by its ID.
+   * If onDelete: 'CASCADE' is set on the relation, related student responses will be automatically deleted.
+   * @param submissionId The ID of the quiz submission to delete.
+   * @returns A message indicating the success or failure of the operation.
+   * @throws NotFoundException if the quiz submission is not found.
+   */
+  async deleteSubmissionById(submissionId: string): Promise<{ message: string }> {
+    // Find the submission first to ensure it exists
+    const submission = await this.quizSubmissionRepository.findOne({ where: { submissionId } });
+
+    if (!submission) {
+      throw new NotFoundException(`Quiz submission with ID "${submissionId}" not found.`);
+    }
+
+    // If onDelete: 'CASCADE' is configured in your entities, the database will handle
+    // deleting associated student responses automatically when the QuizSubmission is deleted.
+    // So, we can remove the explicit `studentResponseRepository.delete` call here.
+    const deleteResult = await this.quizSubmissionRepository.delete(submissionId);
+
+    if (deleteResult.affected === 0) {
+      throw new NotFoundException(`Failed to delete quiz submission with ID "${submissionId}".`);
+    }
+
+    return { message: `Quiz submission with ID "${submissionId}" successfully deleted.` };
+  }
+
+  /**
+   * Deletes all quiz submissions and their associated student responses from the database.
+   * If onDelete: 'CASCADE' is set on the relation, related student responses will be automatically deleted.
+   * @returns A message indicating the success of the operation and the count of deleted items.
+   */
+  async deleteAllSubmissions(): Promise<{ message: string; deletedCount: number }> {
+    // If onDelete: 'CASCADE' is configured, deleting submissions will cascade to responses.
+    // So, we can remove the explicit `studentResponseRepository.delete` call here.
+    const deleteResult = await this.quizSubmissionRepository.delete({});
+    const deletedCount = deleteResult.affected || 0;
+    console.log(`Deleted ${deletedCount} quiz submissions.`);
+    return { message: `Successfully deleted ${deletedCount} quiz submissions.`, deletedCount };
   }
 }

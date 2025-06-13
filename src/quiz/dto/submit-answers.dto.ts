@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // src/quiz/dto/submit-answers.dto.ts
 import {
   IsArray,
