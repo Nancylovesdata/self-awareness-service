@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // src/quiz/quiz.service.ts
 
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -53,7 +54,6 @@ export class QuizService {
     console.log('--- Inside QuizService submitAnswers method ---');
     console.log('Received DTO:', submitAnswersDto);
 
-    // <--- MODIFIED: Destructure quizTitle from submitAnswersDto
     const { answers, userName, phoneNumber, quizTitle } = submitAnswersDto;
 
     const scores: { [key: string]: number } = { A: 0, D: 0, N: 0, C: 0 };
@@ -97,22 +97,37 @@ export class QuizService {
 
     await this.studentResponseRepository.save(savedResponses);
 
-    const personalityType = Object.keys(scores).reduce((a, b) =>
-      scores[a] > scores[b] ? a : b,
+    // --- MODIFIED LOGIC START: Handle ties and generate personality type string ---
+    const maxScore = Math.max(...Object.values(scores));
+    const highestLetters = Object.keys(scores).filter(
+      (letter) => scores[letter] === maxScore,
     );
-    const publicSpeakingPersonalityMeaning =
-      this.letterMeanings[personalityType] || 'Unknown';
+
+    // If there's a tie, show all tied letters separated by a slash (e.g., "N/D")
+    const publicSpeakingPersonalityType = highestLetters.join('/');
 
     console.log('Calculated Scores:', scores);
-    console.log('Determined Personality Type:', personalityType);
+    console.log(
+      'Determined Personality Type (for response):',
+      publicSpeakingPersonalityType,
+    );
+    // --- MODIFIED LOGIC END ---
+
+    // Save the full meaning to the database for later retrieval/admin purposes
+    const fullMeaningForDb =
+      highestLetters
+        .map((letter) => this.letterMeanings[letter] || 'Unknown')
+        .join('/') || 'Unknown';
 
     const quizSubmission = this.quizSubmissionRepository.create({
       userName: userName,
       phoneNumber: phoneNumber,
-      quizTitle: quizTitle, // <--- ADDED: Save quizTitle to the submission
+      quizTitle: quizTitle,
       scores: scores,
-      publicSpeakingPersonalityType: personalityType,
-      publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
+      // Save the combined personality type (e.g., "N/D")
+      publicSpeakingPersonalityType: publicSpeakingPersonalityType,
+      // Save the full meaning for database records, but not for the immediate response to the user
+      publicSpeakingPersonalityMeaning: fullMeaningForDb,
     });
 
     const savedQuizSubmission =
@@ -122,11 +137,13 @@ export class QuizService {
 
     return {
       scores: scores as { A: number; D: number; N: number; C: number },
-      publicSpeakingPersonalityType: personalityType,
-      publicSpeakingPersonalityMeaning: publicSpeakingPersonalityMeaning,
+      // Return only the letter(s) as requested
+      publicSpeakingPersonalityType: publicSpeakingPersonalityType,
+      // Ensure this is an empty string or removed from DTO for the immediate response
+      publicSpeakingPersonalityMeaning: '', // IMPORTANT: Keep this empty for the immediate response
       userName: userName,
-      phoneNumber: phoneNumber, // <--- MODIFIED: Include phoneNumber in response
-      quizTitle: quizTitle, // <--- MODIFIED: Include quizTitle in response
+      phoneNumber: phoneNumber,
+      quizTitle: quizTitle,
       submissionId: savedQuizSubmission.submissionId,
       submissionDate: savedQuizSubmission.submissionDate.toISOString(),
     };
@@ -145,15 +162,19 @@ export class QuizService {
       );
     }
 
+    // For historical retrieval (e.g., by an admin), you might want to return the full meaning.
+    // However, if this endpoint is also exposed to the user immediately after submission,
+    // you might need to apply the same logic as `submitAnswers` to hide the full meaning.
+    // Assuming this might be for internal/admin retrieval or later use where full meaning is allowed:
     return {
       submissionId: submission.submissionId,
       scores: submission.scores,
-      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType,
+      publicSpeakingPersonalityType: submission.publicSpeakingPersonalityType, // This will be N/D if saved as such
       publicSpeakingPersonalityMeaning:
-        submission.publicSpeakingPersonalityMeaning,
+        submission.publicSpeakingPersonalityMeaning, // This will have the full meaning if saved as such
       userName: submission.userName,
-      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in response
-      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in response
+      phoneNumber: submission.phoneNumber,
+      quizTitle: submission.quizTitle,
       submissionDate: submission.submissionDate.toISOString(),
     };
   }
@@ -162,7 +183,6 @@ export class QuizService {
   async findAllQuizSubmissions(): Promise<FullQuizSubmissionResponse[]> {
     const submissions = await this.quizSubmissionRepository.find();
 
-    // Map each QuizSubmission entity to the FullQuizSubmissionResponse type
     return submissions.map((submission) => ({
       submissionId: submission.submissionId,
       scores: submission.scores,
@@ -170,8 +190,8 @@ export class QuizService {
       publicSpeakingPersonalityMeaning:
         submission.publicSpeakingPersonalityMeaning,
       userName: submission.userName,
-      phoneNumber: submission.phoneNumber, // <--- MODIFIED: Include phoneNumber in mapped response
-      quizTitle: submission.quizTitle, // <--- MODIFIED: Include quizTitle in mapped response
+      phoneNumber: submission.phoneNumber,
+      quizTitle: submission.quizTitle,
       submissionDate: submission.submissionDate.toISOString(),
     }));
   }

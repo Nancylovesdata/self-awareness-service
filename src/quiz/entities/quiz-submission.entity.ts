@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // src/quiz/entities/quiz-submission.entity.ts
 
 import {
