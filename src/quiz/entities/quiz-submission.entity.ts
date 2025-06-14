@@ -7,10 +7,40 @@ import {
   Column,
   CreateDateColumn,
   BeforeInsert,
-  OneToMany, // <--- ADDED: Import OneToMany
+  ValueTransformer, // <--- ADD THIS IMPORT
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { StudentResponse } from './student-response.entity'; // <--- ADDED: Import StudentResponse
+
+// Define the JSON transformer
+const jsonTransformer: ValueTransformer = {
+  from: (value: string | null) => {
+    // When reading from the database (text column)
+    if (value === null || value === undefined) {
+      return null;
+    }
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      console.error("Failed to parse JSON from DB for 'scores':", value, e);
+      // Depending on your error handling preference, you might return null,
+      // an empty object, or re-throw the error. Returning null is safer for now.
+      return null;
+    }
+  },
+  to: (value: any) => {
+    // When writing to the database (text column)
+    if (value === null || value === undefined) {
+      return null;
+    }
+    try {
+      return JSON.stringify(value);
+    } catch (e) {
+      console.error("Failed to stringify JSON for DB for 'scores':", value, e);
+      // Similar error handling as above
+      return null;
+    }
+  },
+};
 
 @Entity('quiz_submissions') // Changed from 'quiz_submission' to 'quiz_submissions' based on common plural naming or your preference
 export class QuizSubmission {
@@ -26,9 +56,9 @@ export class QuizSubmission {
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   submissionDate: Date;
 
-  // Recommended for JSON-like objects in SQLite for automatic serialization/deserialization
-  @Column({ type: 'simple-json' }) // <--- CHANGED: Use 'simple-json' for JSON objects with SQLite
-  scores: { A: number; D: number; N: number; C: number };
+  // Apply the transformer here:
+  @Column({ type: 'text', transformer: jsonTransformer }) // <--- CHANGE IS HERE
+  scores: { A: number; D: number; N: number; C: number }; // <--- Keep this as the object type now
 
   @Column()
   publicSpeakingPersonalityType: string;
@@ -37,19 +67,7 @@ export class QuizSubmission {
   publicSpeakingPersonalityMeaning: string;
 
   @Column()
-  quizTitle: string; // Correctly defined as a Column
-
-  // --- NEW: One-to-Many relationship to StudentResponse ---
-  // This defines that one QuizSubmission can have many StudentResponses.
-  // 'studentResponse => studentResponse.quizSubmission' links to the 'quizSubmission' property in StudentResponse.
-  // 'cascade: true' means that if you save a QuizSubmission, its related StudentResponses will also be saved.
-  // 'onDelete: 'CASCADE'' means that if a QuizSubmission is deleted, all associated StudentResponses will also be deleted by the database.
-  @OneToMany(() => StudentResponse, (studentResponse) => studentResponse.quizSubmission, {
-    cascade: ['insert', 'update'], // Cascade inserts/updates when saving QuizSubmission
-    onDelete: 'CASCADE', // Database-level cascade delete
-    nullable: true, // A submission might not have responses yet if created without them (though less likely in this flow)
-  })
-  studentResponses: StudentResponse[]; // <--- CHANGED: Correctly typed as an array of StudentResponse entities
+  quizTitle: string;
 
   @BeforeInsert()
   generateSubmissionId() {

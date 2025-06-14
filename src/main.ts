@@ -7,13 +7,19 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { DataSource } from 'typeorm';
 
+// Ensure this import is at the top of your file if not already present
+import * as dotenv from 'dotenv';
+
 async function bootstrap() {
+  dotenv.config(); // Load environment variables from .env file
+  console.log('CORS_ORIGINS loaded from .env:', process.env.CORS_ORIGINS); // <-- ADDED LINE
+
   const app = await NestFactory.create(AppModule);
 
   // IMPORTANT: Update CORS origin to allow both frontend domains
- // Split the string by comma and trim any whitespace from each origin
+  // Split the string by comma and trim any whitespace from each origin
   const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
     : ['http://localhost:4200']; // Fallback for development if not set
 
   app.enableCors({
